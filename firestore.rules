@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { 
+      // Safe helper for Admin role
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; 
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    // ----------------------------------------------------------------------
+    // USERS (Must isolate PII but currently flattened)
+    // ----------------------------------------------------------------------
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role', 'createdAt'])
+        && data.email is string && data.email.size() <= 100
+        && data.role is string && (data.role == 'user' || data.role == 'admin')
+        && (!('name' in data) || (data.name is string && data.name.size() <= 100))
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 20))
+        && (!('address' in data) || (data.address is string && data.address.size() <= 200))
+        && (data.createdAt is number || data.createdAt is timestamp);
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || (request.auth.uid != userId && isAdmin()));
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
+      // Owner can update safe fields, admins can update any valid fields
+      allow update: if isSignedIn() && isValidUser(incoming()) && (
+        (request.auth.uid == userId && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'address', 'updatedAt']) ||
+          (request.auth.token.email == 'admin@sfood.com' && incoming().diff(existing()).affectedKeys().hasOnly(['role']))
+        )) ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // ----------------------------------------------------------------------
+    // RESTAURANTS
+    // ----------------------------------------------------------------------
+    function isValidRestaurant(data) {
+      return data.keys().hasAll(['name'])
+        && data.name is string && data.name.size() <= 100;
+    }
+
+    match /restaurants/{restaurantId} {
+      // Anyone can read restaurants
+      allow read: if true;
+      // Admins can create and delete
+      allow create, delete: if isAdmin();
+      // Users can update restaurant ratings, admins can update everything
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['rating', 'reviews', 'reviewCount'])
+      );
+    }
+
+    // ----------------------------------------------------------------------
+    // ORDERS
+    // ----------------------------------------------------------------------
+    function isValidOrder(data) {
+       return data.keys().hasAll(['userId', 'items', 'totalPrice', 'status'])
+         && data.userId is string
+         && data.status is string
+         && data.totalPrice is number;
+    }
+
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      // Users can create orders, admins can update
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidOrder(incoming());
+      // Users can rate their own orders
+      allow update: if isAdmin() || (
+        isSignedIn() && existing().userId == request.auth.uid &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['restaurantRating', 'driverRating', 'restaurantReview', 'driverReview', 'isRated'])
+      );
+    }
+  }
+}

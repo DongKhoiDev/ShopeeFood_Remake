@@ -1,0 +1,27 @@
+src/components/Navbar.tsx:                  <img referrerPolicy="no-referrer" 
+src/components/RestaurantCard.tsx:          <img referrerPolicy="no-referrer" 
+src/features/dashboard/Dashboard.tsx:                           <img referrerPolicy="no-referrer" src={getFoodImage(item.image, item.id)} alt={item.name} className="w-12 h-12 rounded-xl object-cover" />
+src/features/drivers/Drivers.tsx:                              <img referrerPolicy="no-referrer" src={driver.avatar} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+src/features/drivers/Drivers.tsx:                           {formData.avatar ? <img referrerPolicy="no-referrer" src={formData.avatar} className="w-full h-full object-cover" /> : <Plus className="w-8 h-8 text-gray-400 group-hover:text-[#ee4d2d]" />}
+src/features/products/Products.tsx:                           <img referrerPolicy="no-referrer" src={getFoodImage(product.image, product.id)} className="w-12 h-12 rounded-xl object-cover border border-gray-100 group-hover:scale-105 transition-transform shrink-0" />
+src/features/products/Products.tsx:                           {formData.image ? <img referrerPolicy="no-referrer" src={formData.image} className="w-full h-full object-cover" /> : <Plus className="w-8 h-8 text-gray-400 group-hover:text-[#ee4d2d]" />}
+src/features/restaurants/Restaurants.tsx:                              <img referrerPolicy="no-referrer" src={getRestaurantImage(restaurant.image, restaurant.id)} className="w-12 h-12 rounded-xl object-cover border border-gray-100" />
+src/features/restaurants/Restaurants.tsx:                           {formData.image ? <img referrerPolicy="no-referrer" src={formData.image} className="w-full h-full object-cover" /> : <Plus className="w-8 h-8 text-gray-400 group-hover:text-[#ee4d2d]" />}
+src/features/restaurants/Restaurants.tsx:                     <img referrerPolicy="no-referrer" src={getRestaurantImage(selectedRestaurantView.image, selectedRestaurantView.id)} className="w-32 h-32 rounded-2xl object-cover shadow-sm border border-gray-100" />
+src/layouts/AdminLayout.tsx:                <img referrerPolicy="no-referrer" src={user?.avatar} className="w-8 h-8 rounded-full" alt="" />
+src/pages/Checkout.tsx:                          <img referrerPolicy="no-referrer" src={getFoodImage(item.image, item.id)} className="w-full h-full object-cover" alt={item.name} />
+src/pages/Checkout.tsx:                       <img referrerPolicy="no-referrer" src={getRestaurantImage(order.restaurantImage, order.restaurantId || order.id)} className="w-full h-full object-cover" alt="" />
+src/pages/Checkout.tsx:                     <img referrerPolicy="no-referrer" src={getRestaurantImage(order.restaurantImage, order.restaurantId || order.id)} className="w-full h-full object-cover" alt="" />
+src/pages/FlashSale.tsx:                  <img referrerPolicy="no-referrer" src={getFoodImage(item.image, item.id)} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+src/pages/Home.tsx:                    <img referrerPolicy="no-referrer" src={getFoodImage(item.image, item.id)} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+src/pages/ItemDetail.tsx:                <img referrerPolicy="no-referrer" src={getFoodImage(item.image, item.id)} className="w-full h-full object-cover transition-transform duration-700 hover:scale-105" alt={item.name} />
+src/pages/ItemDetail.tsx:                    <img referrerPolicy="no-referrer" src={getFoodImage(item.image, item.id)} className="w-full h-full object-cover opacity-80" alt="Thumbnail" />
+src/pages/ItemDetail.tsx:                           <img referrerPolicy="no-referrer" src={review.avatar} className="w-12 h-12 rounded-full border border-gray-100" />
+src/pages/ItemDetail.tsx:                                  <img referrerPolicy="no-referrer" src={img} className="w-full h-full object-cover" />
+src/pages/Login.tsx:                  <img referrerPolicy="no-referrer" src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
+src/pages/Login.tsx:                  <img referrerPolicy="no-referrer" src="https://www.facebook.com/favicon.ico" className="w-4 h-4" alt="Facebook" />
+src/pages/OrderTracking.tsx:                       <img referrerPolicy="no-referrer" src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=1000&auto=format&fit=crop" className="w-full h-full object-cover" alt="Driver" />
+src/pages/Register.tsx:                  <img referrerPolicy="no-referrer" src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
+src/pages/Register.tsx:                  <img referrerPolicy="no-referrer" src="https://www.facebook.com/favicon.ico" className="w-4 h-4" alt="Facebook" />
+src/pages/RestaurantDetail.tsx:          <img referrerPolicy="no-referrer" 
+src/pages/RestaurantDetail.tsx:        <img referrerPolicy="no-referrer" src={getFoodImage(item.image, item.id)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={item.name} />

@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "number", "description": "Timestamp" },
+        "updatedAt": { "type": "number", "description": "Timestamp" }
+      },
+      "required": ["email", "role", "createdAt"]
+    },
+    "Restaurant": {
+      "title": "Restaurant",
+      "description": "Restaurant data including menu as an array to allow client-side searching and easy retrieval.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "image": { "type": "string" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "string" },
+        "reviews": { "type": "number" },
+        "categories": { "type": "array", "items": { "type": "string" } },
+        "address": { "type": "string" },
+        "distance": { "type": "string" },
+        "deliveryTime": { "type": "string" },
+        "deliveryFee": { "type": "string" },
+        "isPromo": { "type": "boolean" },
+        "isPartner": { "type": "boolean" },
+        "ownerId": { "type": "string", "description": "Admin/Owner UID" },
+        "menu": { 
+          "type": "array",
+          "items": { "type": "object" },
+          "description": "Array of food items"
+        },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "categories", "menu", "ownerId", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Order records",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "restaurantId": { "type": "string" },
+        "restaurantName": { "type": "string" },
+        "restaurantImage": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "object" } },
+        "totalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["PENDING", "PREPARING", "DELIVERING", "COMPLETED", "CANCELLED"] },
+        "date": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "restaurantId", "items", "totalPrice", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles including their roles (user/admin)."
+    },
+    "restaurants/{restaurantId}": {
+      "schema": { "$ref": "#/entities/Restaurant" },
+      "description": "Stores all restaurant and menu data. Owner can edit."
+    },
+    "orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Orders placed by users. Users can read theirs, admins/restaurant owners can read."
+    }
+  }
+}
