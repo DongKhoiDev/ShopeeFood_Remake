@@ -6,7 +6,6 @@ export default function BottomNav() {
   const tabs = [
     { name: 'Trang chủ', icon: Home, path: '/' },
     { name: 'Đơn hàng', icon: ReceiptText, path: '/checkout' },
-    { name: 'Thông báo', icon: Bell, path: '/notifications' },
     { name: 'Tôi', icon: User, path: '/profile' },
   ];
 
