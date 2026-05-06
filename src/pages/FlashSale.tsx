@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
 import BottomNav from '../components/BottomNav';
@@ -29,20 +29,22 @@ export default function FlashSale() {
   };
 
   // Mock sale items
-  const saleItems = restaurants.flatMap(r => 
-    r.menu.slice(0, 2).map((item: any) => {
-      const price = item.price || 0;
-      return {
-        ...item,
-        price,
-        restaurantId: r.id,
-        restaurantName: r.name,
-        originalPrice: Math.round(price * 1.5),
-        soldCount: Math.floor(Math.random() * 50) + 10,
-        totalCount: 100
-      };
-    })
-  ).sort(() => Math.random() - 0.5);
+  const saleItems = useMemo(() => {
+    return restaurants.flatMap(r => 
+      r.menu.slice(0, 2).map((item: any) => {
+        const price = item.price || 0;
+        return {
+          ...item,
+          price,
+          restaurantId: r.id,
+          restaurantName: r.name,
+          originalPrice: Math.round(price * 1.5),
+          soldCount: Math.floor(Math.random() * 50) + 10,
+          totalCount: 100
+        };
+      })
+    ).sort(() => Math.random() - 0.5);
+  }, [restaurants]);
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] pb-24">
