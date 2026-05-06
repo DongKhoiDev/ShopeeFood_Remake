@@ -114,9 +114,11 @@ export function StatsCard({ title, value, change, icon: Icon, color }: any) {
          <div className={`p-3 rounded-2xl ${color}`}>
             <Icon className="w-6 h-6" />
          </div>
-         <span className={`text-[10px] font-black uppercase tracking-widest ${change.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
-            {change} tháng này
-         </span>
+         {change && (
+            <span className={`text-[10px] font-black uppercase tracking-widest ${change.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
+               {change} tháng này
+            </span>
+         )}
       </div>
       <h3 className="text-gray-400 font-bold text-sm mb-1 uppercase tracking-wider">{title}</h3>
       <p className="text-3xl font-black text-gray-900">{value}</p>

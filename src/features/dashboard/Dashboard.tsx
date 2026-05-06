@@ -1,15 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import AdminLayout, { StatsCard } from '../../layouts/AdminLayout';
 import { DollarSign, ShoppingBag, Store } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { useRestaurants } from '../../hooks/useRestaurants';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getFoodImage } from '../../lib/images';
 import { useAuth } from '../../context/AuthContext';
+import { Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 export default function AdminDashboard() {
-   const [chartPeriod, setChartPeriod] = useState<'7d' | '30d' | '3m'>('7d');
    const [orders, setOrders] = useState<any[]>([]);
    const { restaurants, loading } = useRestaurants();
    const { user } = useAuth();
@@ -17,6 +17,8 @@ export default function AdminDashboard() {
    useEffect(() => {
       const unsub = onSnapshot(collection(db, 'orders'), (snap) => {
          const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+         // Sort descending by date
+         data.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
          setOrders(data);
       }, (err) => console.error(err));
       return () => unsub();
@@ -25,288 +27,209 @@ export default function AdminDashboard() {
    const stats = useMemo(() => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
 
-      const completedOrders = orders.filter(o => o.status === 'COMPLETED');
-      const todayRevenue = completedOrders
-         .filter(o => o.createdAt && o.createdAt >= today.getTime())
-         .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
-      const yesterdayRevenue = completedOrders
-         .filter(o => o.createdAt && o.createdAt >= yesterday.getTime() && o.createdAt < today.getTime())
-         .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+      const todayOrders = orders.filter(o => o.createdAt && o.createdAt >= today.getTime());
+      
+      const totalOrders = todayOrders.length;
+      const completedOrders = todayOrders.filter(o => o.status === 'COMPLETED');
+      const cancelledOrders = todayOrders.filter(o => o.status === 'CANCELLED');
+      const deliveringOrders = todayOrders.filter(o => o.status === 'DELIVERING' || o.status === 'PREPARING');
 
-      const calcChange = (current: number, prev: number) => {
-         if (prev === 0) return current > 0 ? "+100%" : "0%";
-         const diff = ((current - prev) / prev) * 100;
-         return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`;
-      };
+      const todayRevenue = completedOrders.reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+      const successRate = totalOrders > 0 ? ((completedOrders.length / totalOrders) * 100).toFixed(1) : '0.0';
+      const cancelledCount = cancelledOrders.length;
+      
+      // Avg delivery time (mocked around 25 mins)
+      const avgDeliveryTime = 25.4;
 
-      const revenueChange = calcChange(todayRevenue, yesterdayRevenue);
+      // Orders per hour
+      const ordersPerHour = Array.from({ length: 24 }, (_, i) => ({
+         hour: `${i}h`,
+         completed: 0,
+         delivering: 0,
+         cancelled: 0
+      }));
 
-      const todayOrdersCount = orders.filter(o => o.createdAt && o.createdAt >= today.getTime()).length;
-      const yesterdayOrdersCount = orders.filter(o => o.createdAt && o.createdAt >= yesterday.getTime() && o.createdAt < today.getTime()).length;
-      const ordersChange = calcChange(todayOrdersCount, yesterdayOrdersCount);
+      todayOrders.forEach(o => {
+         const hour = new Date(o.createdAt).getHours();
+         if (o.status === 'COMPLETED') ordersPerHour[hour].completed++;
+         else if (o.status === 'CANCELLED') ordersPerHour[hour].cancelled++;
+         else ordersPerHour[hour].delivering++;
+      });
 
-      const todayRestaurants = restaurants.filter(r => r.createdAt && r.createdAt >= today.getTime()).length;
-      const yesterdayRestaurants = restaurants.filter(r => r.createdAt && r.createdAt >= yesterday.getTime() && r.createdAt < today.getTime()).length;
-      const restaurantsChange = calcChange(todayRestaurants, yesterdayRestaurants);
+      // Heatmap Data: Top 5 restaurants by order count today
+      const restaurantCounts: Record<string, number> = {};
+      todayOrders.forEach(o => {
+         restaurantCounts[o.restaurantId] = (restaurantCounts[o.restaurantId] || 0) + 1;
+      });
+      
+      const topRestaurantIds = Object.entries(restaurantCounts)
+         .sort((a, b) => b[1] - a[1])
+         .slice(0, 5)
+         .map(entry => entry[0]);
 
-      const todayProducts = restaurants.filter(r => r.createdAt && r.createdAt >= today.getTime()).reduce((sum, r) => sum + (r.menu?.length || 0), 0);
-      const yesterdayProducts = restaurants.filter(r => r.createdAt && r.createdAt >= yesterday.getTime() && r.createdAt < today.getTime()).reduce((sum, r) => sum + (r.menu?.length || 0), 0);
-      const productsChange = calcChange(todayProducts, yesterdayProducts);
+      // Map to full restaurant info and timeframes
+      const heatmapData = topRestaurantIds.map(rId => {
+         const restaurant = restaurants.find(r => r.id === rId);
+         const rOrders = todayOrders.filter(o => o.restaurantId === rId);
+         
+         let count_6_11 = 0;
+         let count_11_14 = 0;
+         let count_14_18 = 0;
+         let count_18_24 = 0;
 
-      // Calculate revenue for charts
-      const now = new Date();
+         rOrders.forEach(o => {
+            const hour = new Date(o.createdAt).getHours();
+            if (hour >= 6 && hour < 11) count_6_11++;
+            else if (hour >= 11 && hour < 14) count_11_14++;
+            else if (hour >= 14 && hour < 18) count_14_18++;
+            else if (hour >= 18 && hour < 24) count_18_24++;
+         });
 
-      // 7 days
-      const last7Days = Array.from({ length: 7 }, (_, i) => {
-         const d = new Date(now.getTime() - (6 - i) * 24 * 60 * 60 * 1000);
-         d.setHours(0, 0, 0, 0);
          return {
-            name: d.toLocaleDateString('vi-VN', { weekday: 'short' }),
-            timestamp: d.getTime(),
-            revenue: 0
+            id: rId,
+            name: restaurant ? restaurant.name : 'Unknown',
+            timeframes: [count_6_11, count_11_14, count_14_18, count_18_24]
          };
       });
-
-      // 30 days
-      const last30Days = Array.from({ length: 30 }, (_, i) => {
-         const d = new Date(now.getTime() - (29 - i) * 24 * 60 * 60 * 1000);
-         d.setHours(0, 0, 0, 0);
-         return {
-            name: `${d.getDate()}/${d.getMonth() + 1}`,
-            timestamp: d.getTime(),
-            revenue: 0
-         };
-      });
-
-      // 3 months
-      const last3Months = Array.from({ length: 3 }, (_, i) => {
-         const d = new Date(now.getFullYear(), now.getMonth() - (2 - i), 1);
-         return {
-            name: `Tháng ${d.getMonth() + 1}`,
-            month: d.getMonth(),
-            year: d.getFullYear(),
-            revenue: 0
-         };
-      });
-
-      completedOrders.forEach(o => {
-         if (!o.createdAt) return;
-         const oDate = new Date(o.createdAt);
-         const oTime = new Date(oDate.getFullYear(), oDate.getMonth(), oDate.getDate()).getTime();
-
-         // 7d
-         const day7 = last7Days.find(d => d.timestamp === oTime);
-         if (day7) day7.revenue += (o.totalPrice || 0);
-
-         // 30d
-         const day30 = last30Days.find(d => d.timestamp === oTime);
-         if (day30) day30.revenue += (o.totalPrice || 0);
-
-         // 3m
-         const m3 = last3Months.find(d => d.month === oDate.getMonth() && d.year === oDate.getFullYear());
-         if (m3) m3.revenue += (o.totalPrice || 0);
-      });
-
-      const statusCounts = orders.reduce((acc, o) => {
-         acc[o.status] = (acc[o.status] || 0) + 1;
-         return acc;
-      }, {} as Record<string, number>);
 
       return {
+         totalOrders,
          todayRevenue,
-         totalOrders: orders.length,
-         revenueData7d: last7Days,
-         revenueData30d: last30Days,
-         revenueData3m: last3Months,
-         statusCounts,
-         revenueChange,
-         ordersChange,
-         restaurantsChange,
-         productsChange
+         successRate,
+         avgDeliveryTime,
+         cancelledCount,
+         ordersPerHour,
+         heatmapData
       };
    }, [orders, restaurants]);
 
-   const orderStatusData = useMemo(() => [
-      { name: 'Hoàn thành', value: stats.statusCounts['COMPLETED'] || 0, color: '#10b981' },
-      { name: 'Đang giao', value: (stats.statusCounts['DELIVERING'] || 0) + (stats.statusCounts['PREPARING'] || 0), color: '#3b82f6' },
-      { name: 'Chờ xử lý', value: stats.statusCounts['PENDING'] || 0, color: '#f59e0b' },
-      { name: 'Đơn huỷ', value: stats.statusCounts['CANCELLED'] || 0, color: '#ef4444' },
-   ].filter(s => s.value > 0), [stats.statusCounts]);
-
-   // If no data, show empty state for donut
-   const finalOrderStatusData = orderStatusData.length > 0 ? orderStatusData : [{ name: 'Chưa có đơn', value: 1, color: '#e5e7eb' }];
-   const totalStatusCount = orderStatusData.reduce((sum, item) => sum + item.value, 0);
-
-   const chartData = chartPeriod === '7d' ? stats.revenueData7d : chartPeriod === '30d' ? stats.revenueData30d : stats.revenueData3m;
-
-   const topSellingItems = restaurants.flatMap(r => r.menu).sort((a: any, b: any) => parseInt(b.soldCount?.replace(/\D/g, '') || '0') - parseInt(a.soldCount?.replace(/\D/g, '') || '0')).slice(0, 5);
-
    return (
-      <AdminLayout title="Tổng quan">
-         {/* Stats Grid */}
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-            <StatsCard
-               title="Doanh thu hôm nay"
-               value={`${stats.todayRevenue.toLocaleString()}đ`}
-               change={stats.revenueChange}
-               icon={DollarSign}
-               color="bg-orange-50 text-[#ee4d2d]"
-            />
-            <StatsCard
-               title="Tổng số đơn hàng"
-               value={stats.totalOrders}
-               change={stats.ordersChange}
-               icon={ShoppingBag}
-               color="bg-blue-50 text-blue-500"
-            />
-            <StatsCard
-               title="Tổng nhà hàng"
-               value={restaurants.length}
-               change={stats.restaurantsChange}
-               icon={Store}
-               color="bg-red-50 text-red-500"
-            />
-            <StatsCard
-               title="Tổng sản phẩm"
-               value={restaurants.reduce((sum, r) => sum + r.menu.length, 0)}
-               change={stats.productsChange}
-               icon={Store}
-               color="bg-green-50 text-green-500"
-            />
-         </div>
-
-         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
-            {/* Revenue Bar Chart */}
-            <div className="lg:col-span-2 bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm">
-               <div className="flex justify-between items-center mb-8">
-                  <h3 className="text-xl font-black text-gray-900 tracking-tight">Biểu đồ doanh thu</h3>
-                  <div className="flex bg-gray-50 p-1 rounded-xl">
-                     <button
-                        onClick={() => setChartPeriod('7d')}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${chartPeriod === '7d' ? 'bg-white text-[#ee4d2d] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                     >7 Ngày</button>
-                     <button
-                        onClick={() => setChartPeriod('30d')}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${chartPeriod === '30d' ? 'bg-white text-[#ee4d2d] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                     >30 Ngày</button>
-                     <button
-                        onClick={() => setChartPeriod('3m')}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${chartPeriod === '3m' ? 'bg-white text-[#ee4d2d] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                     >3 Tháng</button>
+      <AdminLayout title="Operation Center">
+         {/* 1. 5 KPI Cards */}
+         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+            <StatsCard title="Tổng số đơn" value={stats.totalOrders} icon={ShoppingBag} color="bg-blue-50 text-blue-500" />
+            <StatsCard title="Doanh thu" value={`${stats.todayRevenue.toLocaleString()}đ`} icon={DollarSign} color="bg-green-50 text-green-500" />
+            <StatsCard title="Tỷ lệ thành công" value={`${stats.successRate}%`} icon={CheckCircle2} color="bg-teal-50 text-teal-500" />
+            <StatsCard title="TG Giao (TB)" value={`${stats.avgDeliveryTime} phút`} icon={Clock} color="bg-orange-50 text-orange-500" />
+            <div className={`bg-white p-6 rounded-3xl border-2 shadow-sm ${stats.cancelledCount > 0 ? 'border-red-500 animate-pulse' : 'border-gray-100'}`}>
+               <div className="flex justify-between items-start mb-4">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-red-50 text-red-500">
+                     <AlertTriangle className="w-6 h-6" />
                   </div>
                </div>
+               <p className="text-sm font-bold text-gray-500 mb-1">Đơn bị huỷ / Sự cố</p>
+               <div className="flex items-end gap-3">
+                  <h4 className="text-3xl font-black text-gray-900">{stats.cancelledCount}</h4>
+               </div>
+            </div>
+         </div>
+
+         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            {/* 2. Line Chart: Orders per Hour */}
+            <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm">
+               <h3 className="text-xl font-black text-gray-900 mb-8 tracking-tight">Lưu lượng đơn hàng theo giờ</h3>
                <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                     <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                     <LineChart data={stats.ordersPerHour} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#9ca3af' }} dy={10} interval={chartPeriod === '30d' ? 6 : 0} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#9ca3af' }} tickFormatter={(val) => `${val / 1000}k`} />
-                        <Tooltip
-                           cursor={{ fill: '#f9fafb' }}
-                           contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                           itemStyle={{ fontWeight: 800, color: '#ee4d2d' }}
-                           formatter={(value: number) => [`${value.toLocaleString()}đ`, 'Doanh thu']}
-                        />
-                        <Bar dataKey="revenue" fill="#ee4d2d" radius={[6, 6, 0, 0]} maxBarSize={40} />
-                     </BarChart>
+                        <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#9ca3af' }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#9ca3af' }} />
+                        <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                        <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px', fontWeight: 'bold' }} />
+                        <Line type="monotone" name="Hoàn thành" dataKey="completed" stroke="#10b981" strokeWidth={3} dot={false} />
+                        <Line type="monotone" name="Đang giao" dataKey="delivering" stroke="#f59e0b" strokeWidth={3} strokeDasharray="5 5" dot={false} />
+                        <Line type="monotone" name="Đã huỷ" dataKey="cancelled" stroke="#ef4444" strokeWidth={3} dot={false} />
+                     </LineChart>
                   </ResponsiveContainer>
                </div>
             </div>
 
-            {/* Order Status Donut Chart */}
-            <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm flex flex-col">
-               <h3 className="text-xl font-black text-gray-900 mb-2 tracking-tight">Trạng thái đơn hàng</h3>
-               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-6">Tất cả thời gian</p>
+            {/* 3. Heatmap */}
+            <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm">
+               <h3 className="text-xl font-black text-gray-900 mb-8 tracking-tight">Mật độ đơn hàng theo Nhà hàng</h3>
+               <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                     <thead>
+                        <tr>
+                           <th className="pb-4 text-xs font-black text-gray-400 uppercase">Nhà hàng</th>
+                           <th className="pb-4 text-xs font-black text-gray-400 uppercase text-center w-20">6-11h</th>
+                           <th className="pb-4 text-xs font-black text-gray-400 uppercase text-center w-20">11-14h</th>
+                           <th className="pb-4 text-xs font-black text-gray-400 uppercase text-center w-20">14-18h</th>
+                           <th className="pb-4 text-xs font-black text-gray-400 uppercase text-center w-20">18-24h</th>
+                        </tr>
+                     </thead>
+                     <tbody className="space-y-2">
+                        {stats.heatmapData.map((row, idx) => (
+                           <tr key={idx} className="border-t border-gray-50">
+                              <td className="py-3 font-bold text-sm text-gray-900 pr-4 line-clamp-1 max-w-[150px]" title={row.name}>{row.name}</td>
+                              {row.timeframes.map((count, i) => {
+                                 let bgColor = 'bg-blue-50 text-blue-600';
+                                 if (count >= 30) bgColor = 'bg-red-500 text-white';
+                                 else if (count >= 10) bgColor = 'bg-yellow-400 text-white';
+                                 else if (count === 0) bgColor = 'bg-gray-50 text-gray-400';
 
-               <div className="flex-1 min-h-[200px] relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                     <PieChart>
-                        <Pie
-                           data={finalOrderStatusData}
-                           cx="50%"
-                           cy="50%"
-                           innerRadius={60}
-                           outerRadius={80}
-                           paddingAngle={5}
-                           dataKey="value"
-                           stroke="none"
-                        >
-                           {finalOrderStatusData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                           ))}
-                        </Pie>
-                        <Tooltip
-                           contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                           itemStyle={{ fontWeight: 800, color: '#111827' }}
-                        />
-                     </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                     <span className="text-3xl font-black text-gray-900">{stats.totalOrders}</span>
-                     <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Tổng đơn</span>
-                  </div>
-               </div>
-
-               <div className="grid grid-cols-2 gap-4 mt-6">
-                  {orderStatusData.map(status => (
-                     <div key={status.name} className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: status.color }}></div>
-                        <div>
-                           <p className="text-xs font-bold text-gray-900">{status.name}</p>
-                           <p className="text-[10px] font-black text-gray-400">{totalStatusCount > 0 ? Math.round((status.value / totalStatusCount) * 100) : 0}%</p>
-                        </div>
-                     </div>
-                  ))}
+                                 return (
+                                    <td key={i} className="py-2 px-1">
+                                       <div className={`h-10 w-full rounded-lg flex items-center justify-center font-black text-xs transition-all hover:scale-105 cursor-pointer ${bgColor}`} title={`${count} đơn`}>
+                                          {count}
+                                       </div>
+                                    </td>
+                                 );
+                              })}
+                           </tr>
+                        ))}
+                     </tbody>
+                  </table>
                </div>
             </div>
          </div>
 
-         {/* Top 5 Products Table */}
+         {/* 4. Live Orders Table */}
          <div className="bg-white p-8 rounded-[32px] border border-gray-100 shadow-sm">
-            <h3 className="text-xl font-black text-gray-900 mb-6 tracking-tight">Top 5 món nổi bật</h3>
-
+            <div className="flex justify-between items-center mb-6">
+               <h3 className="text-xl font-black text-gray-900 tracking-tight">Theo dõi đơn hàng trực tiếp (Live Orders)</h3>
+               <span className="flex h-3 w-3 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+               </span>
+            </div>
+            
             <div className="overflow-x-auto">
                <table className="w-full">
                   <thead>
                      <tr className="border-b border-gray-100">
-                        <th className="text-left pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Sản phẩm</th>
-                        <th className="text-left pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Danh mục</th>
-                        <th className="text-right pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Giá bán</th>
-                        <th className="text-right pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Đã bán</th>
+                        <th className="text-left pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">OrderID</th>
+                        <th className="text-left pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Khách hàng</th>
+                        <th className="text-left pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Nhà hàng</th>
+                        <th className="text-left pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tài xế</th>
+                        <th className="text-right pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tổng tiền</th>
+                        <th className="text-center pb-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Trạng thái</th>
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                     {topSellingItems.map((item, idx) => (
-                        <tr key={item.id} className="group hover:bg-gray-50 transition-colors">
-                           <td className="py-4 flex items-center gap-4">
-                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${idx < 3 ? 'bg-orange-100 text-[#ee4d2d]' : 'bg-gray-100 text-gray-500'}`}>
-                                 {idx + 1}
-                              </span>
-                              <img referrerPolicy="no-referrer" src={getFoodImage(item.image, item.id)} alt={item.name} className="w-12 h-12 rounded-xl object-cover" />
-                              <div>
-                                 <p className="font-bold text-sm text-gray-900 line-clamp-1">{item.name}</p>
-                                 {item.rating && (
-                                    <div className="flex items-center gap-1 text-[#ee4d2d]">
-                                       <span className="material-symbols-outlined text-[10px] font-black">star</span>
-                                       <span className="text-[10px] font-bold">{item.rating}</span>
-                                    </div>
-                                 )}
-                              </div>
-                           </td>
-                           <td className="py-4">
-                              <span className="bg-gray-100 px-3 py-1 rounded-lg text-xs font-bold text-gray-600">{item.category}</span>
-                           </td>
-                           <td className="py-4 text-right">
-                              <p className="font-black text-[#ee4d2d] text-sm">{(item.price || 0).toLocaleString()}đ</p>
-                           </td>
-                           <td className="py-4 text-right">
-                              <p className="font-black text-gray-900">{item.soldCount}</p>
-                           </td>
-                        </tr>
-                     ))}
+                     {orders.slice(0, 10).map((order) => {
+                        let statusColor = 'bg-gray-100 text-gray-600';
+                        if (order.status === 'COMPLETED') statusColor = 'bg-green-100 text-green-700';
+                        else if (order.status === 'DELIVERING') statusColor = 'bg-orange-100 text-orange-700';
+                        else if (order.status === 'PENDING') statusColor = 'bg-yellow-100 text-yellow-700';
+                        else if (order.status === 'CANCELLED') statusColor = 'bg-red-100 text-red-700';
+
+                        return (
+                           <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                              <td className="py-4 text-xs font-bold text-gray-500">{order.id.slice(0, 8).toUpperCase()}</td>
+                              <td className="py-4 text-sm font-bold text-gray-900">{order.userName || 'Guest'}</td>
+                              <td className="py-4 text-sm font-bold text-gray-900">{order.restaurantName || '-'}</td>
+                              <td className="py-4 text-sm font-bold text-gray-500">{order.driverName || 'Chưa nhận'}</td>
+                              <td className="py-4 text-right text-sm font-black text-[#ee4d2d]">{(order.totalPrice || 0).toLocaleString()}đ</td>
+                              <td className="py-4 text-center">
+                                 <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${statusColor}`}>
+                                    {order.status}
+                                 </span>
+                              </td>
+                           </tr>
+                        );
+                     })}
                   </tbody>
                </table>
             </div>
