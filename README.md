@@ -1,7 +1,7 @@
-# 🛵 SFood - Ứng dụng đặt đồ ăn trực tuyến (Food Delivery & Ordering App)
+# 🛵 ShopeeFood - Ứng dụng đặt đồ ăn trực tuyến (Food Delivery & Ordering App)
 
 ## 🎯 Giới thiệu
-SFood là một ứng dụng ứng dụng phân phối hình thức đặt đồ ăn (Food Delivery) được xây dựng bằng React, Vite, Tailwind CSS, kết hợp với Firebase (Authentication và Firestore). Ứng dụng cho phép người dùng tìm kiếm món ăn, đặt hàng, thanh toán (sandbox) và có trang quản trị (Admin/Dashboard) riêng.
+ShopeeFood là một ứng dụng ứng dụng phân phối hình thức đặt đồ ăn (Food Delivery) được xây dựng bằng React, Vite, Tailwind CSS, kết hợp với Firebase (Authentication và Firestore). Ứng dụng cho phép người dùng tìm kiếm món ăn, đặt hàng, thanh toán (sandbox) và có trang quản trị (Admin/Dashboard) riêng.
 
 ---
 
@@ -12,7 +12,7 @@ SFood là một ứng dụng ứng dụng phân phối hình thức đặt đồ
     *   Hỗ trợ Đăng nhập với tài khoản Google. (Đã bỏ đăng nhập với Facebook do cấu hình phức tạp chưa khả dụng)
     *   Phân quyền Người dùng (User) và Quản trị viên (Admin).
     *   *Tài khoản Admin thử nghiệm:* 
-        *   Email: `admin@sfood.com`
+        *   Email: `admin@ShopeeFood.com`
         *   Pass: `123456`
 
 2.  **Tính năng Khách hàng (User Features):**
@@ -32,51 +32,50 @@ SFood là một ứng dụng ứng dụng phân phối hình thức đặt đồ
 
 ---
 
-## 🚧 Những gì chưa hoàn thành / Có thể phát triển thêm (To-Do)
+## 🛠️ HƯỚNG DẪN CẤU HÌNH MÔI TRƯỜNG & CHẠY DỰ ÁN 
 
-1.  **Thanh toán thực (Payment Gateway Integration):**
-    *   Hiện tại ứng dụng tạo các đơn hàng với phương thức (Cash/Card) nhưng mô phỏng. Cần kết nối tới cổng thanh toán (VNPay, MoMo, Stripe) ở backend.
-2.  **Thông báo thời gian thực & Chat:**
-    *   Gửi thông báo qua FCM hoặc thư xác nhận qua email tự động.
-    *   Tích hợp chat trực tuyến với hỗ trợ viên hoặc Shipper.
-3.  **Hệ thống Driver/Shipper App:**
-    *   Thiếu phân hệ cho tài xế để nhận đơn hàng và cập nhật hành trình trên bản đồ.
-4.  **Quản lý Media:**
-    *   Upload ảnh Avatar, ảnh cover Nhà hàng (Firebase Storage chưa được áp dụng mà đang dùng Image URL placeholder hoặc copy Link).
+### 📋 Yêu cầu hệ thống:
+*   **Node.js** bản mới nhất (khuyến nghị từ bản `18.x` hoặc `20.x` trở lên để đảm bảo tính tương thích).
+*   Đã có cài đặt **NPM** (đi kèm khi cài đặt Node.js).
 
 ---
 
-## 🛠 Hướng dẫn Cài đặt & Chạy ứng dụng (Installation & Setup)
+### 🚀 Các Bước Triển Khai Chi Tiết:
 
-Yêu cầu môi trường có cài **Node.js** (Tối thiểu bản 18+).
-
-### Bước 1: Cài đặt Dependencies
-Sau khi tải hoặc clone code về, mở terminal ở thư mục dự án và chạy:
+#### 🔹 Bước 1: Cài đặt Thư viện (Dependencies)
+Mở cửa sổ dòng lệnh (Terminal/Command Prompt) tại thư mục gốc của dự án và chạy lệnh sau để tự động tải các gói tài nguyên:
 ```bash
 npm install
 ```
 
-### Bước 2: Thiết lập Biến Môi Trường (Environment) & Firebase Config
-Sao chép tập tin `.env.example` thành `.env` (hoặc `.env.local`), điền các giá trị thích hợp nếu có cấu hình Google OAuth.
+#### 🔹 Bước 2: Thiết lập Tệp Cấu hình Firebase
+Dự án được kết nối trực tiếp với hệ cơ sở dữ liệu **Cloud Firestore (Real-time Database)** đã được thiết lập sẵn của nhóm. Cấu hình kết nối nằm trọn vẹn trong tệp `firebase-applet-config.json` ở thư mục gốc. 
+*   *Lưu ý:* Thầy/Cô **không cần cấu hình thêm bất kỳ tài nguyên cơ sở dữ liệu nào** vì hệ thống Firebase của nhóm đã hoạt động 24/7 trực tuyến.
+*   Nếu Thầy/Cô muốn tự triển khai trên Firebase cá nhân: Thay thế nội dung file `firebase-applet-config.json` bằng Credentials tương ứng của Thầy/Cô.
 
-Dự án này sử dụng Firebase. Cấu hình được đặt tại `firebase-applet-config.json`, bao gồm api key, auth domain, firestoreDatabaseId, project id.
-Nếu bạn tự thiết lập dự án Firebase trên tài khoản riêng:
-1. Tạo Firebase project tại console.firebase.google.com
-2. Bật **Firebase Authentication** trong đó mở Sign-in providers: *Email/Password*, *Google*.
-3. Bật **Cloud Firestore**. 
-4. Thay thế nội dung file `firebase-applet-config.json` bằng cấu hình của dự án Firebase của bạn.
+#### 🔹 Bước 3: Áp dụng Quy Tắc Bảo Mật (Firestore Security Rules)
+Các quy tắc bảo mật phân quyền nghiêm ngặt của dự án được lưu trong file `firestore.rules`.
+*   Quy tắc này ngăn chặn tuyệt đối khách hàng truy cập trái phép vào dữ liệu kinh doanh của Admin, đồng thời cô lập dữ liệu cá nhân của từng khách hàng.
+*   Nội dung rules này đã được deploy trực tiếp lên server chính thức.
 
-### Bước 3: Áp dụng Security Rules cho Firestore (Bắt buộc)
-Các quy tắc bảo mật Database được lưu trong file `firestore.rules`.
-- Bạn sao chép toàn bộ nội dung file `firestore.rules` và dán (Publish) vào **Tab Rules** của **Cloud Firestore** trên tài khoản Firebase của bạn để App có quyền Read/Write Database một cách bảo mật.
-
-### Bước 4: Chạy project
-Khởi động development server:
+#### 🔹 Bước 4: Khởi Chạy Ứng Dụng Độc Lập
+Chạy lệnh dưới đây để khởi chạy máy chủ phát triển cục bộ:
 ```bash
 npm run dev
 ```
+Sau đó, Thầy/Cô chỉ cần click vào liên kết hiển thị trên màn hình terminal (thường là `http://localhost:5173`) để mở giao diện đặt đồ ăn trực tuyến!
 
-Truy cập ứng dụng trên trình duyệt web theo cổng hiển thị ở console. Thường là `http://localhost:5173`. Chúc bạn trải nghiệm ứng dụng vui vẻ!
+---
+
+### 🔑 THÔNG TIN TÀI KHOẢN THỬ NGHIỆM ĐỂ ĐÁNH GIÁ:
+
+Để hỗ trợ Thầy/Cô đánh giá toàn diện hệ thống quản trị, phân quyền và giám sát thông minh BI (Business Intelligence), nhóm đã tạo sẵn các tài khoản thử nghiệm sau:
+
+| Vai trò | Email đăng nhập | Mật khẩu | Chức năng đánh giá chính |
+| :--- | :--- | :--- | :--- |
+| **Quản trị viên (Admin)** | `admin@ShopeeFood.com` | `123456` | Trải nghiệm **Operation Control Center**, Line Chart thời gian thực, Custom Heatmap, và bảng giám sát Live Orders |
+| **Khách hàng mẫu (User)** | `user@ShopeeFood.com` | `123456` | Trải nghiệm luồng đặt hàng, giỏ hàng, và trang cá nhân Customer Dashboard |
+
 
 ---
 
