@@ -1,39 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
 import { Users, Plus, Edit2, Trash2, Search, Filter, Star, Eye, ShieldCheck, MapPin, X, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
-// Mock Data
-const MOCK_DRIVERS_DATA = [
-  { id: 'D001', name: 'Nguyễn Văn Tài', phone: '0909123456', license: '59A1-12345', rating: 4.9, status: 'ONLINE', totalTrips: 1250, joinDate: '2023-01-10', avatar: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=200' },
-  { id: 'D002', name: 'Lê Hoàng Phong', phone: '0918234567', license: '59B2-98765', rating: 4.6, status: 'OFFLINE', totalTrips: 840, joinDate: '2023-03-22', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&q=80&w=200' },
-  { id: 'D003', name: 'Trần Minh Tuấn', phone: '0937345678', license: '60C1-55555', rating: 4.2, status: 'BANNED', totalTrips: 320, joinDate: '2023-06-05', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200' },
-];
-
-const MOCK_REVIEWS = {
-  'D001': [
-    { id: 1, customerName: 'Hoàng Long', rating: 5, comment: 'Tài xế thân thiện, giao hàng rất nhanh.', date: '15/10/2023' },
-    { id: 2, customerName: 'Minh Tuấn', rating: 5, comment: 'Rất nhiệt tình!', date: '14/10/2023' }
-  ],
-  'D002': [
-    { id: 3, customerName: 'Thanh Trúc', rating: 4, comment: 'Giao hàng đúng giờ.', date: '12/10/2023' }
-  ],
-  'D003': [
-    { id: 4, customerName: 'Bảo Thy', rating: 2, comment: 'Hơi chậm.', date: '01/10/2023' }
-  ]
-};
+import { db } from '../../firebase';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 
 export default function Drivers() {
-  const [drivers, setDrivers] = useState(MOCK_DRIVERS_DATA);
+  const [drivers, setDrivers] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingDriver, setEditingDriver] = useState<any>(null);
   const [formData, setFormData] = useState({ name: '', phone: '', license: '', status: 'ONLINE', avatar: '' });
   const [showReviewsModal, setShowReviewsModal] = useState(false);
   const [selectedDriverReviews, setSelectedDriverReviews] = useState<any>(null);
-
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({ status: '', minRating: '' });
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'drivers'), (snap) => {
+      setDrivers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
 
   const filteredDrivers = drivers.filter(d => {
     const matchSearch = d.name.toLowerCase().includes(searchTerm.toLowerCase()) || d.phone.includes(searchTerm);
@@ -54,28 +42,29 @@ export default function Drivers() {
     setShowAddModal(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name || !formData.phone) return alert('Vui lòng nhập tên và số điện thoại!');
-
-    if (editingDriver) {
-       setDrivers(prev => prev.map(d => d.id === editingDriver.id ? { ...d, ...formData } : d));
-    } else {
-       const newDriver = {
-          id: `D${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+    try {
+      if (editingDriver) {
+        await updateDoc(doc(db, 'drivers', editingDriver.id), { ...formData });
+      } else {
+        const newId = `drv_${Date.now()}`;
+        await setDoc(doc(db, 'drivers', newId), {
           ...formData,
           rating: 0,
           totalTrips: 0,
           joinDate: new Date().toISOString().split('T')[0],
-          avatar: formData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200'
-       };
-       setDrivers(prev => [newDriver, ...prev]);
-    }
+          avatar: formData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200',
+          createdAt: Date.now()
+        });
+      }
+    } catch(e) { console.error(e); alert('Lỗi khi lưu tài xế'); }
     setShowAddModal(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Bạn có chắc muốn xoá tài xế này?')) {
-       setDrivers(prev => prev.filter(d => d.id !== id));
+      try { await deleteDoc(doc(db, 'drivers', id)); } catch(e) { console.error(e); }
     }
   };
 
@@ -202,7 +191,7 @@ export default function Drivers() {
                            <div className="flex items-center justify-center gap-1">
                               <button 
                                 onClick={() => {
-                                  setSelectedDriverReviews({ driver, reviews: MOCK_REVIEWS[driver.id as keyof typeof MOCK_REVIEWS] || [] });
+                                  setSelectedDriverReviews({ driver, reviews: [] });
                                   setShowReviewsModal(true);
                                 }}
                                 className="p-2.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all shadow-sm"

@@ -1,16 +1,36 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import AdminLayout, { StatsCard } from '../../layouts/AdminLayout';
-import { DollarSign, ShoppingBag, XCircle, Store, TrendingUp, ChevronDown } from 'lucide-react';
+import { DollarSign, ShoppingBag, Store, Database } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } from 'recharts';
 import { useRestaurants } from '../../hooks/useRestaurants';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getFoodImage } from '../../lib/images';
+import { useAuth } from '../../context/AuthContext';
+import { seedDatabase } from '../../lib/seedDatabase';
 
 export default function AdminDashboard() {
    const [chartPeriod, setChartPeriod] = useState<'7d' | '30d' | '3m'>('7d');
    const [orders, setOrders] = useState<any[]>([]);
+   const [isSeeding, setIsSeeding] = useState(false);
+   const [seedDone, setSeedDone] = useState(false);
    const { restaurants, loading } = useRestaurants();
+   const { user } = useAuth();
+
+   const handleSeed = async () => {
+      if (!user) return alert('Cần đăng nhập admin!');
+      if (!window.confirm('Seed ~6 nhà hàng, 6 tài xế và 60 đơn hàng vào Firebase?')) return;
+      setIsSeeding(true);
+      try {
+         await seedDatabase(user.id);
+         setSeedDone(true);
+         alert('✅ Seed dữ liệu thành công! Dashboard sẽ cập nhật ngay.');
+      } catch (e) {
+         console.error(e);
+         alert('❌ Lỗi khi seed: ' + e);
+      }
+      setIsSeeding(false);
+   };
 
    useEffect(() => {
       const unsub = onSnapshot(collection(db, 'orders'), (snap) => {
@@ -23,11 +43,36 @@ export default function AdminDashboard() {
    const stats = useMemo(() => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
 
       const completedOrders = orders.filter(o => o.status === 'COMPLETED');
       const todayRevenue = completedOrders
          .filter(o => o.createdAt && o.createdAt >= today.getTime())
          .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+      const yesterdayRevenue = completedOrders
+         .filter(o => o.createdAt && o.createdAt >= yesterday.getTime() && o.createdAt < today.getTime())
+         .reduce((sum, o) => sum + (o.totalPrice || 0), 0);
+
+      const calcChange = (current: number, prev: number) => {
+         if (prev === 0) return current > 0 ? "+100%" : "0%";
+         const diff = ((current - prev) / prev) * 100;
+         return `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`;
+      };
+
+      const revenueChange = calcChange(todayRevenue, yesterdayRevenue);
+
+      const todayOrdersCount = orders.filter(o => o.createdAt && o.createdAt >= today.getTime()).length;
+      const yesterdayOrdersCount = orders.filter(o => o.createdAt && o.createdAt >= yesterday.getTime() && o.createdAt < today.getTime()).length;
+      const ordersChange = calcChange(todayOrdersCount, yesterdayOrdersCount);
+
+      const todayRestaurants = restaurants.filter(r => r.createdAt && r.createdAt >= today.getTime()).length;
+      const yesterdayRestaurants = restaurants.filter(r => r.createdAt && r.createdAt >= yesterday.getTime() && r.createdAt < today.getTime()).length;
+      const restaurantsChange = calcChange(todayRestaurants, yesterdayRestaurants);
+
+      const todayProducts = restaurants.filter(r => r.createdAt && r.createdAt >= today.getTime()).reduce((sum, r) => sum + (r.menu?.length || 0), 0);
+      const yesterdayProducts = restaurants.filter(r => r.createdAt && r.createdAt >= yesterday.getTime() && r.createdAt < today.getTime()).reduce((sum, r) => sum + (r.menu?.length || 0), 0);
+      const productsChange = calcChange(todayProducts, yesterdayProducts);
 
       // Calculate revenue for charts
       const now = new Date();
@@ -94,9 +139,13 @@ export default function AdminDashboard() {
          revenueData7d: last7Days,
          revenueData30d: last30Days,
          revenueData3m: last3Months,
-         statusCounts
+         statusCounts,
+         revenueChange,
+         ordersChange,
+         restaurantsChange,
+         productsChange
       };
-   }, [orders]);
+   }, [orders, restaurants]);
 
    const orderStatusData = useMemo(() => [
       { name: 'Hoàn thành', value: stats.statusCounts['COMPLETED'] || 0, color: '#10b981' },
@@ -115,33 +164,44 @@ export default function AdminDashboard() {
 
    return (
       <AdminLayout title="Tổng quan">
+         {/* Seed Button */}
+         <div className="flex justify-end mb-6">
+            <button
+               onClick={handleSeed}
+               disabled={isSeeding}
+               className="flex items-center gap-2 bg-gray-900 text-white text-xs font-black uppercase tracking-widest px-5 py-3 rounded-2xl hover:bg-[#ee4d2d] transition-all shadow-md disabled:opacity-50"
+            >
+               <Database className="w-4 h-4" />
+               {isSeeding ? 'Đang seed...' : seedDone ? '✅ Đã seed' : 'Seed dữ liệu mẫu'}
+            </button>
+         </div>
          {/* Stats Grid */}
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
             <StatsCard
                title="Doanh thu hôm nay"
                value={`${stats.todayRevenue.toLocaleString()}đ`}
-               change="0%"
+               change={stats.revenueChange}
                icon={DollarSign}
                color="bg-orange-50 text-[#ee4d2d]"
             />
             <StatsCard
                title="Tổng số đơn hàng"
                value={stats.totalOrders}
-               change="0%"
+               change={stats.ordersChange}
                icon={ShoppingBag}
                color="bg-blue-50 text-blue-500"
             />
             <StatsCard
                title="Tổng nhà hàng"
                value={restaurants.length}
-               change="0%"
+               change={stats.restaurantsChange}
                icon={Store}
                color="bg-red-50 text-red-500"
             />
             <StatsCard
                title="Tổng sản phẩm"
                value={restaurants.reduce((sum, r) => sum + r.menu.length, 0)}
-               change="0%"
+               change={stats.productsChange}
                icon={Store}
                color="bg-green-50 text-green-500"
             />
