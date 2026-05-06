@@ -1,36 +1,18 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import AdminLayout, { StatsCard } from '../../layouts/AdminLayout';
-import { DollarSign, ShoppingBag, Store, Database } from 'lucide-react';
+import { DollarSign, ShoppingBag, Store } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, PieChart, Pie, Cell } from 'recharts';
 import { useRestaurants } from '../../hooks/useRestaurants';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { getFoodImage } from '../../lib/images';
 import { useAuth } from '../../context/AuthContext';
-import { seedDatabase } from '../../lib/seedDatabase';
 
 export default function AdminDashboard() {
    const [chartPeriod, setChartPeriod] = useState<'7d' | '30d' | '3m'>('7d');
    const [orders, setOrders] = useState<any[]>([]);
-   const [isSeeding, setIsSeeding] = useState(false);
-   const [seedDone, setSeedDone] = useState(false);
    const { restaurants, loading } = useRestaurants();
    const { user } = useAuth();
-
-   const handleSeed = async () => {
-      if (!user) return alert('Cần đăng nhập admin!');
-      if (!window.confirm('Seed ~6 nhà hàng, 6 tài xế và 60 đơn hàng vào Firebase?')) return;
-      setIsSeeding(true);
-      try {
-         await seedDatabase(user.id);
-         setSeedDone(true);
-         alert('✅ Seed dữ liệu thành công! Dashboard sẽ cập nhật ngay.');
-      } catch (e) {
-         console.error(e);
-         alert('❌ Lỗi khi seed: ' + e);
-      }
-      setIsSeeding(false);
-   };
 
    useEffect(() => {
       const unsub = onSnapshot(collection(db, 'orders'), (snap) => {
@@ -164,17 +146,6 @@ export default function AdminDashboard() {
 
    return (
       <AdminLayout title="Tổng quan">
-         {/* Seed Button */}
-         <div className="flex justify-end mb-6">
-            <button
-               onClick={handleSeed}
-               disabled={isSeeding}
-               className="flex items-center gap-2 bg-gray-900 text-white text-xs font-black uppercase tracking-widest px-5 py-3 rounded-2xl hover:bg-[#ee4d2d] transition-all shadow-md disabled:opacity-50"
-            >
-               <Database className="w-4 h-4" />
-               {isSeeding ? 'Đang seed...' : seedDone ? '✅ Đã seed' : 'Seed dữ liệu mẫu'}
-            </button>
-         </div>
          {/* Stats Grid */}
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
             <StatsCard
